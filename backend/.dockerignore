@@ -1,0 +1,14 @@
+.env
+.env.*
+*.exe
+*.exe~
+*.dll
+*.so
+*.test
+*.out
+Dockerfile
+.dockerignore
+.git
+.gitignore
+public/uploads
+tmp

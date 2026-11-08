@@ -1,0 +1,80 @@
+name: kilas
+
+services:
+  # MySQL database (official image). Everything runs from `docker compose up`.
+  # Note: the official mysql image has no Alpine variant.
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${DATABASE_NAME:-kilas}
+      MYSQL_USER: ${DATABASE_USERNAME:-kilas}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:-kilas}
+    volumes:
+      # Persist the database across container rebuilds
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: kilas-backend:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Bind inside the container regardless of what .env says for local dev
+      APP_ADDRESS: 0.0.0.0
+      APP_PORT: "8080"
+      GIN_MODE: release
+      # Point the backend at the bundled database by default.
+      # Override DATABASE_HOST in .env to use an external MySQL instead.
+      DATABASE_HOST: ${DATABASE_HOST:-db}
+      DATABASE_PORT: ${DATABASE_PORT:-3306}
+      DATABASE_NAME: ${DATABASE_NAME:-kilas}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-kilas}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-kilas}
+    volumes:
+      # Persist uploaded images across container rebuilds
+      - uploads:/app/public/uploads
+    extra_hosts:
+      # Lets DATABASE_HOST=host.docker.internal reach MySQL on the host (Linux)
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Same-origin API: nginx proxies /api to the backend service
+        VITE_API_BASE_URL: /api
+    image: kilas-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  uploads:

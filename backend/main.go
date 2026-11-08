@@ -15,10 +15,10 @@ import (
 )
 
 func main() {
-	// Load .env file
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error Loading .env file")
+	// Load .env file when present (e.g. local development).
+	// In containers the values come from the actual environment instead.
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables")
 	}
 	appAddress := os.Getenv("APP_ADDRESS")
 	appPort := os.Getenv("APP_PORT")
