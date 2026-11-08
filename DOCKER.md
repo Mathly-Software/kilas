@@ -73,6 +73,25 @@ Database credentials are only applied when `db_data` is empty. If you change
 `DATABASE_*` values later, run `docker compose down -v` to re-initialize (this deletes
 existing data).
 
+## Automatic deployment
+
+`.github/workflows/deploy.yaml` SSHes into the VPS and runs `auto_deploy.sh`, which now:
+
+1. checks that `.env` exists and the user can access Docker,
+2. pulls newer base images and rebuilds the backend/frontend images,
+3. recreates the containers with `docker compose up -d --remove-orphans`,
+4. prints container status, prunes dangling images, and smoke-tests `/api/ping`.
+
+One-time VPS setup:
+
+```bash
+cd /home/sekilas/kilas
+cp .env.docker.example .env      # edit secrets + DB password
+sudo usermod -aG docker "$USER"  # allow docker without sudo, then log out/in
+# If migrating from the old systemd/nginx deployment, free port 80 first:
+# sudo systemctl disable --now kilas_backend.service nginx
+```
+
 ## Notes
 
 - `main.go` no longer requires a `.env` file; it falls back to real environment
