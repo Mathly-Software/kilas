@@ -85,7 +85,7 @@ existing data).
 One-time VPS setup:
 
 ```bash
-cd /home/sekilas/kilas
+cd /home/simpl-admin/kilas
 cp .env.docker.example .env      # edit secrets + DB password
 sudo usermod -aG docker "$USER"  # allow docker without sudo, then log out/in
 # If migrating from the old systemd/nginx deployment, free port 80 first:
