@@ -1,0 +1,8 @@
+# Environment files (secrets) — commit .env.*.example only
+.env
+.env.local
+.env.production
+.env.development
+
+# Logs
+*.log
