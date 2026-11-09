@@ -11,6 +11,7 @@ import StudyPage from './pages/StudyPage';
 import StatsPage from './pages/StatsPage';
 import ProfilePage from './pages/ProfilePage';
 import ShopPage from './pages/ShopPage';
+import TermsPage from './pages/TermsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
 import { useLanguageSync } from './hooks/useLanguageSync';
@@ -24,6 +25,8 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/" element={<LandingPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/tnc" element={<Navigate to="/terms" replace />} />
 
       {/* Protected Routes inside AppLayout */}
       <Route element={<ProtectedRoute />}>
