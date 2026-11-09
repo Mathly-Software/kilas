@@ -221,8 +221,16 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full bg-background border-t-2 border-gray-200 py-8 text-center text-gray-400 font-bold text-sm uppercase tracking-widest">
-        <p>© {new Date().getFullYear()} Kilas. All rights reserved.</p>
+      <footer className="w-full bg-background border-t-2 border-gray-200 py-8 text-center font-bold text-sm uppercase tracking-widest text-gray-400">
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+          <Link to="/terms" className="hover:text-feather-green transition-colors">
+            {t.terms.termsLink}
+          </Link>
+          <a href="mailto:support@kilas.my.id" className="hover:text-feather-green transition-colors">
+            support@kilas.my.id
+          </a>
+        </div>
+        <p className="mt-4">© {new Date().getFullYear()} Kilas. All rights reserved.</p>
       </footer>
     </div>
   );
