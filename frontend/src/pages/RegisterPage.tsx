@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
-import { Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader2, Check } from 'lucide-react';
 import { useTranslation } from '../hooks/useTranslation';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { BASE_URL } from '../lib/api';
@@ -14,6 +14,8 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [termsError, setTermsError] = useState(false);
   
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { t } = useTranslation();
@@ -30,6 +32,12 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationErrors({});
+
+    if (!acceptedTerms) {
+      setTermsError(true);
+      toast.error(t.terms.mustAccept);
+      return;
+    }
 
     if (password !== confirmPassword) {
       toast.error(t.auth.passwordsNotMatch);
@@ -52,6 +60,11 @@ export default function RegisterPage() {
   };
 
   const handleGoogleLogin = () => {
+    if (!acceptedTerms) {
+      setTermsError(true);
+      toast.error(t.terms.mustAccept);
+      return;
+    }
     window.location.href = `${BASE_URL}/auth/google`;
   };
 
@@ -166,6 +179,58 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          {/* Terms acceptance — required */}
+          <div className="pt-1">
+            <label
+              className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition-colors ${
+                termsError && !acceptedTerms
+                  ? 'border-danger-red bg-danger-red/5'
+                  : acceptedTerms
+                    ? 'border-feather-green/40 bg-feather-green/5'
+                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => {
+                  setAcceptedTerms(e.target.checked);
+                  if (e.target.checked) setTermsError(false);
+                }}
+                aria-label={t.terms.termsLink}
+                className="sr-only"
+              />
+              <span
+                aria-hidden="true"
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+                  acceptedTerms
+                    ? 'border-feather-green bg-feather-green text-white'
+                    : termsError
+                      ? 'border-danger-red bg-white'
+                      : 'border-gray-300 bg-white'
+                }`}
+              >
+                {acceptedTerms && <Check className="h-3.5 w-3.5" strokeWidth={4} />}
+              </span>
+              <span className="text-sm font-semibold leading-snug text-gray-600">
+                {t.terms.agreePrefix}{' '}
+                <Link
+                  to="/terms"
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="font-bold text-sky-blue underline underline-offset-2 hover:text-sky-blue-dark"
+                >
+                  {t.terms.termsLink}
+                </Link>{' '}
+                <span className="text-danger-red">*</span>
+              </span>
+            </label>
+            {termsError && !acceptedTerms && (
+              <p className="mt-2 px-2 text-xs font-bold text-danger-red">{t.terms.mustAccept}</p>
+            )}
+          </div>
+
           <button
             type="submit"
             disabled={isLoading || (confirmPassword.length > 0 && password !== confirmPassword)}
@@ -183,7 +248,9 @@ export default function RegisterPage() {
 
         <button
           onClick={handleGoogleLogin}
-          className="btn-ghost w-full py-3 mt-6 border-2 border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center gap-3 text-gray-600"
+          disabled={!acceptedTerms}
+          title={!acceptedTerms ? t.terms.mustAccept : undefined}
+          className="btn-ghost w-full py-3 mt-6 border-2 border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center gap-3 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
