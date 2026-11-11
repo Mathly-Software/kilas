@@ -71,7 +71,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/api\/.*/i,
+            urlPattern: /\/api\/(?!auth(?:\/|$)).*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
