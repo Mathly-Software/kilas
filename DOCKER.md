@@ -66,7 +66,7 @@ external/managed MySQL instead, change `DATABASE_HOST` (e.g. `host.docker.intern
 for a database on the Docker host, or the managed hostname) and stop/remove the `db`
 service. The `extra_hosts` mapping makes `host.docker.internal` work on Linux too.
 
-Other values (`ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`, `GEMINI_API_KEY`,
+Other values (`ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`, `DEEPSEEK_API_KEY`,
 Google OAuth, Midtrans) are read from the same `.env` file.
 
 ## Operations
