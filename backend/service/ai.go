@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/joenathan-15/kilas/dto"
-	"google.golang.org/api/option"
 )
 
 type AIService struct{}
@@ -19,20 +20,35 @@ func NewAIService() *AIService {
 	return &AIService{}
 }
 
+type deepSeekChatRequest struct {
+	Model          string                 `json:"model"`
+	Messages       []deepSeekChatMessage  `json:"messages"`
+	Temperature    float64                `json:"temperature"`
+	ResponseFormat deepSeekResponseFormat `json:"response_format"`
+}
+
+type deepSeekChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type deepSeekResponseFormat struct {
+	Type string `json:"type"`
+}
+
+type deepSeekChatResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+}
+
 func (s *AIService) GenerateCards(text string, count int, language string) (*dto.GeneratedDeckData, error) {
-	apiKey := os.Getenv("GEMINI_API_KEY")
+	apiKey := strings.TrimSpace(os.Getenv("DEEPSEEK_API_KEY"))
 	if apiKey == "" {
-		return nil, errors.New("AI not configured")
+		return nil, errors.New("AI not configured: DEEPSEEK_API_KEY is missing")
 	}
-
-	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
-	}
-	defer client.Close()
-
-	model := client.GenerativeModel("gemini-flash-latest")
 
 	targetLang := "Indonesian"
 	if language == "en" {
@@ -40,35 +56,60 @@ func (s *AIService) GenerateCards(text string, count int, language string) (*dto
 	}
 
 	systemPrompt := fmt.Sprintf(
-		"You are an expert educator creating flashcards for students. Generate the content in %s. Generate a title, a short description, 3-5 relevant tags, and exactly %d high-quality flashcard pairs from the study material. Return ONLY a valid JSON object matching this schema: {\"title\": \"string\", \"description\": \"string\", \"tags\": [\"string\"], \"cards\": [{\"front\": \"question\", \"back\": \"answer\"}]}. Keep answers concise. Use $LaTeX$ for math formulas.",
+		"You are an expert educator creating flashcards for students. Generate the content in %s. Generate a title, a short description, 3-5 relevant tags, and exactly %d high-quality flashcard pairs from the study material. Return only a valid JSON object matching this schema: {\"title\": \"string\", \"description\": \"string\", \"tags\": [\"string\"], \"cards\": [{\"front\": \"question\", \"back\": \"answer\"}]}. Keep answers concise. Use $LaTeX$ for math formulas.",
 		targetLang,
 		count,
 	)
 
-	model.SystemInstruction = &genai.Content{
-		Parts: []genai.Part{genai.Text(systemPrompt)},
+	payload := deepSeekChatRequest{
+		Model: "deepseek-chat",
+		Messages: []deepSeekChatMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: text},
+		},
+		Temperature:    0.7,
+		ResponseFormat: deepSeekResponseFormat{Type: "json_object"},
 	}
-	model.SetTemperature(0.7)
-	model.ResponseMIMEType = "application/json"
 
-	resp, err := model.GenerateContent(ctx, genai.Text(text))
+	requestBody, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("Gemini API error: %w", err)
+		return nil, fmt.Errorf("failed to encode DeepSeek request: %w", err)
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.deepseek.com/chat/completions", strings.NewReader(string(requestBody)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DeepSeek request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 90 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("DeepSeek API request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read DeepSeek response: %w", err)
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("DeepSeek API returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var result deepSeekChatResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse DeepSeek response: %w", err)
+	}
+	if len(result.Choices) == 0 || strings.TrimSpace(result.Choices[0].Message.Content) == "" {
 		return nil, errors.New("AI returned no response")
 	}
 
-	part := resp.Candidates[0].Content.Parts[0]
-	textResponse, ok := part.(genai.Text)
-	if !ok {
-		return nil, errors.New("AI returned non-text response")
-	}
-
-	content := strings.TrimSpace(string(textResponse))
-
-	// Strip potential markdown code blocks (e.g. ```json ... ```)
+	content := strings.TrimSpace(result.Choices[0].Message.Content)
 	if strings.HasPrefix(content, "```") {
 		content = strings.TrimPrefix(content, "```json")
 		content = strings.TrimPrefix(content, "```")
@@ -80,7 +121,6 @@ func (s *AIService) GenerateCards(text string, count int, language string) (*dto
 	if err := json.Unmarshal([]byte(content), &data); err != nil {
 		return nil, fmt.Errorf("failed to parse AI response: %w\nResponse was: %s", err, content)
 	}
-
 	if len(data.Cards) == 0 {
 		return nil, errors.New("AI returned no cards, try again")
 	}
