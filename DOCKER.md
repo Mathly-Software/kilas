@@ -26,6 +26,27 @@ docker compose up -d --build
 Open <http://localhost> (or `http://localhost:${FRONTEND_PORT}`). On first start the
 database is created and the backend runs `AutoMigrate` + product seeding automatically.
 
+## Development with Docker
+
+Development uses a separate Compose stack so it does not affect the production setup above.
+From the repository root, run:
+
+```bash
+sh dev-build.sh
+```
+
+Open <http://localhost:5173>. The frontend source is bind-mounted into the Vite
+container and file watching uses polling, so frontend edits hot-reload (including on
+Docker Desktop). API requests are proxied to the backend container. Backend source is
+not mounted: rerunning `sh dev-build.sh` rebuilds the backend image and restarts the
+stack. The backend API is also available at <http://localhost:8080>.
+
+The development database uses its own `dev_db_data` volume and default local-only
+credentials, so an `.env` file is optional. If present, its backend settings are loaded;
+Compose still forces the database hostname and development ports. Stop the stack with
+`Ctrl+C`, or run `docker compose -f docker-compose.dev.yml down`. Add `-v` to that
+command only if you want to delete development database and upload data.
+
 ## Environment
 
 Compose loads `.env` from the project root and passes it to the backend container. The

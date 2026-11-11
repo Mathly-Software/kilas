@@ -1,0 +1,76 @@
+name: kilas-dev
+
+services:
+  db:
+    image: mysql:8.4
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD:-dev-root}
+      MYSQL_DATABASE: ${DATABASE_NAME:-kilas}
+      MYSQL_USER: ${DATABASE_USERNAME:-kilas}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:-kilas}
+    volumes:
+      - dev_db_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: kilas-backend:dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ADDRESS: 0.0.0.0
+      APP_PORT: "8080"
+      GIN_MODE: debug
+      DATABASE_HOST: db
+      DATABASE_PORT: "3306"
+      DATABASE_NAME: ${DATABASE_NAME:-kilas}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-kilas}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-kilas}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-development-access-secret-change-me}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-development-refresh-secret-change-me}
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "8080:8080"
+    volumes:
+      - dev_uploads:/app/public/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    image: kilas-frontend:dev
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    environment:
+      VITE_API_BASE_URL: /api
+      KILAS_API_PROXY_TARGET: http://backend:8080
+      KILAS_VITE_USE_POLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  dev_db_data:
+  dev_uploads:
+  frontend_node_modules:
