@@ -104,9 +104,17 @@ export default defineConfig({
     }),
   ],
   server: {
+    watch: {
+      usePolling: process.env.KILAS_VITE_USE_POLLING === 'true',
+      interval: 1000,
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: process.env.KILAS_API_PROXY_TARGET || 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/public': {
+        target: process.env.KILAS_API_PROXY_TARGET || 'http://localhost:8080',
         changeOrigin: true,
       },
     },
