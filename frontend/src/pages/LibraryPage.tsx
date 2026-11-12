@@ -23,6 +23,7 @@ export default function LibraryPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'popular'>('newest');
   const [page, setPage] = useState(1);
+  const [deckToClone, setDeckToClone] = useState<LibraryDeck | null>(null);
   const limit = 12;
 
   // Debounce search input by 400ms
@@ -52,6 +53,7 @@ export default function LibraryPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['decks'] });
       queryClient.invalidateQueries({ queryKey: ['library'] });
+      setDeckToClone(null);
       toast.success(t.library.copySuccess);
     },
     onError: (err: any) => {
@@ -60,9 +62,7 @@ export default function LibraryPage() {
   });
 
   const handleClone = (deck: LibraryDeck) => {
-    if (window.confirm(t.library.copyConfirm.replace('{title}', deck.title))) {
-      cloneMutation.mutate(deck.id);
-    }
+    setDeckToClone(deck);
   };
 
   const totalPages = result ? Math.ceil(result.total / limit) : 0;
@@ -220,6 +220,53 @@ export default function LibraryPage() {
           <BookOpen className="w-20 h-20 text-gray-200 mb-6" />
           <h2 className="text-2xl font-black text-gray-400 uppercase tracking-tight">{t.library.noLibraryFound}</h2>
           <p className="text-gray-400 font-bold mt-2">{t.library.trySearch}</p>
+        </div>
+      )}
+
+      {deckToClone && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label={t.common.cancel}
+            disabled={cloneMutation.isPending}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setDeckToClone(null)}
+          />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="clone-deck-title"
+            aria-describedby="clone-deck-description"
+            className="relative z-10 w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl animate-in zoom-in-95 duration-200"
+          >
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-blue">
+              <Copy className="h-7 w-7" />
+            </div>
+            <h2 id="clone-deck-title" className="text-center text-xl font-black text-gray-800">
+              {t.library.copyToDecks}
+            </h2>
+            <p id="clone-deck-description" className="mt-2 text-center text-sm font-medium text-gray-500">
+              {t.library.copyConfirm.replace('{title}', deckToClone.title)}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                disabled={cloneMutation.isPending}
+                onClick={() => setDeckToClone(null)}
+                className="flex-1 rounded-xl border-2 border-gray-100 px-4 py-3 font-black text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                {t.common.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={cloneMutation.isPending}
+                onClick={() => cloneMutation.mutate(deckToClone.id)}
+                className="flex-1 rounded-xl bg-feather-green px-4 py-3 font-black text-white transition-colors hover:brightness-95 disabled:opacity-50"
+              >
+                {cloneMutation.isPending ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : t.library.copyToDecks}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

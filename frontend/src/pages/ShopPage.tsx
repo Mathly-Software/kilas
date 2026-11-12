@@ -35,6 +35,7 @@ export default function ShopPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'shop' | 'history'>('shop');
   const [isPurchasing, setIsPurchasing] = useState<number | null>(null);
+  const [isPurchaseErrorOpen, setIsPurchaseErrorOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [selectedTxId, setSelectedTxId] = useState<string | undefined>(undefined);
 
@@ -67,7 +68,7 @@ export default function ShopPage() {
         window.open(res.data.payment_url, '_blank');
       }
     } catch (err) {
-      alert(t.shop.purchaseFailed);
+      setIsPurchaseErrorOpen(true);
     } finally {
       setIsPurchasing(null);
     }
@@ -329,6 +330,41 @@ export default function ShopPage() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {isPurchaseErrorOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close error dialog"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setIsPurchaseErrorOpen(false)}
+          />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="purchase-error-title"
+            className="relative z-10 w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl animate-in zoom-in-95 duration-200"
+          >
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+              <AlertCircle className="h-8 w-8" />
+            </div>
+            <h2 id="purchase-error-title" className="text-xl font-black text-gray-800">
+              {t.common.error}
+            </h2>
+            <p className="mt-2 text-sm font-medium text-gray-500">
+              {t.shop.purchaseFailed}
+            </p>
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setIsPurchaseErrorOpen(false)}
+              className="mt-6 w-full rounded-xl bg-red-500 px-5 py-3 font-black text-white transition-colors hover:bg-red-600"
+            >
+              OK
+            </button>
+          </div>
         </div>
       )}
 

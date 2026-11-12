@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api, { getFullImageUrl } from '../lib/api';
-import { Loader2, ArrowLeft, CheckCircle2, Sparkles } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Sparkles, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../hooks/useTranslation';
 import type { Card, Deck } from '../types';
@@ -35,6 +35,7 @@ export default function StudyPage() {
   const [startTime] = useState(Date.now());
   const [studiedCount, setStudiedCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
+  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
   // Fetch due cards (online only)
   const onlineSandbox = searchParams.get('mode') === 'sandbox';
   const { data: dueData, isLoading: isOnlineLoading, error } = useQuery<StudyDueResponse>({
@@ -329,11 +330,7 @@ export default function StudyPage() {
       {/* Header & Progress */}
       <div className="flex items-center justify-between gap-2 md:gap-4 px-2">
         <button
-          onClick={() => {
-            if (window.confirm(t.study.quitConfirm)) {
-              handleFinish();
-            }
-          }}
+          onClick={() => setIsExitConfirmOpen(true)}
           className="flex items-center gap-1.5 px-3 py-2 hover:bg-gray-100 rounded-xl text-gray-400 transition-colors font-black text-[10px] md:text-xs uppercase tracking-widest shrink-0"
         >
           <ArrowLeft className="w-3.5 h-3.5 md:w-4 md:h-4" />
@@ -449,6 +446,54 @@ export default function StudyPage() {
         <span className="flex items-center gap-2"><div className="px-1.5 py-0.5 bg-gray-200 rounded border-b border-gray-400 text-gray-600">Space</div> {t.study.flip}</span>
         <span className="flex items-center gap-2"><div className="px-1.5 py-0.5 bg-gray-200 rounded border-b border-gray-400 text-gray-600">1-4</div> {t.study.rate}</span>
       </div>
+
+      {isExitConfirmOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label={t.common.cancel}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setIsExitConfirmOpen(false)}
+          />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="exit-study-title"
+            aria-describedby="exit-study-description"
+            className="relative z-10 w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl animate-in zoom-in-95 duration-200"
+          >
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500">
+              <AlertCircle className="h-7 w-7" />
+            </div>
+            <h2 id="exit-study-title" className="text-center text-xl font-black text-gray-800">
+              {t.study.exit}
+            </h2>
+            <p id="exit-study-description" className="mt-2 text-center text-sm font-medium text-gray-500">
+              {t.study.quitConfirm}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsExitConfirmOpen(false)}
+                className="flex-1 rounded-xl border-2 border-gray-100 px-4 py-3 font-black text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                {t.common.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={endSessionMutation.isPending}
+                onClick={() => {
+                  setIsExitConfirmOpen(false);
+                  void handleFinish();
+                }}
+                className="flex-1 rounded-xl bg-amber-500 px-4 py-3 font-black text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
+              >
+                {endSessionMutation.isPending ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : t.study.exit}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

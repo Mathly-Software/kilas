@@ -38,8 +38,11 @@ export default function DeckDetailsPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Card | undefined>();
+  const [cardToDelete, setCardToDelete] = useState<number | null>(null);
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   const [isAIGenerateModalOpen, setIsAIGenerateModalOpen] = useState(false);
+  const [isDeleteDeckConfirmOpen, setIsDeleteDeckConfirmOpen] = useState(false);
+  const [isCloneConfirmOpen, setIsCloneConfirmOpen] = useState(false);
   const { addGeneration, removeGeneration } = useUIStore();
   const { user, fetchMe } = useAuthStore();
   const { data: deck, isLoading } = useQuery<Deck & { cards: Card[] }>({
@@ -100,6 +103,7 @@ export default function DeckDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deck', id] });
       queryClient.invalidateQueries({ queryKey: ['deck-stats', id] });
+      setCardToDelete(null);
       toast.success(t.deckDetails.cardRemoved);
     },
     onError: (err: any) => {
@@ -116,8 +120,12 @@ export default function DeckDetailsPage() {
   };
 
   const handleDeleteCard = (cardId: number) => {
-    if (window.confirm(t.deckDetails.removeCardConfirm)) {
-      deleteCardMutation.mutate(cardId);
+    setCardToDelete(cardId);
+  };
+
+  const confirmDeleteCard = () => {
+    if (cardToDelete !== null) {
+      deleteCardMutation.mutate(cardToDelete);
     }
   };
 
@@ -160,15 +168,14 @@ export default function DeckDetailsPage() {
   };
 
   const handleDeleteDeck = () => {
-    if (window.confirm(t.deckDetails.deleteConfirm)) {
-      deleteDeckMutation.mutate();
-    }
+    setIsDeleteDeckConfirmOpen(true);
   };
 
   const cloneMutation = useMutation({
     mutationFn: (deckId: number) => api.post(`/library/${deckId}/clone`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['decks'] });
+      setIsCloneConfirmOpen(false);
       toast.success(t.library.copySuccess);
       navigate('/decks');
     },
@@ -178,9 +185,7 @@ export default function DeckDetailsPage() {
   });
 
   const handleClone = () => {
-    if (window.confirm(t.library.copyConfirm.replace('{title}', deck?.title || ''))) {
-      cloneMutation.mutate(deck!.id);
-    }
+    setIsCloneConfirmOpen(true);
   };
 
   const handleAIGenerate = async (data: { text: string; count: number; file: File | null; language: string }) => {
@@ -480,6 +485,147 @@ export default function DeckDetailsPage() {
           </div>
         )}
       </section>
+
+      {isCloneConfirmOpen && deck && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label={t.common.cancel}
+            disabled={cloneMutation.isPending}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setIsCloneConfirmOpen(false)}
+          />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="clone-deck-title"
+            aria-describedby="clone-deck-description"
+            className="relative z-10 w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl animate-in zoom-in-95 duration-200"
+          >
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-blue">
+              <Copy className="h-7 w-7" />
+            </div>
+            <h2 id="clone-deck-title" className="text-center text-xl font-black text-gray-800">
+              {t.deckDetails.copyToDecks}
+            </h2>
+            <p id="clone-deck-description" className="mt-2 text-center text-sm font-medium text-gray-500">
+              {t.library.copyConfirm.replace('{title}', deck.title)}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                disabled={cloneMutation.isPending}
+                onClick={() => setIsCloneConfirmOpen(false)}
+                className="flex-1 rounded-xl border-2 border-gray-100 px-4 py-3 font-black text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                {t.common.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={cloneMutation.isPending}
+                onClick={() => cloneMutation.mutate(deck.id)}
+                className="flex-1 rounded-xl bg-feather-green px-4 py-3 font-black text-white transition-colors hover:brightness-95 disabled:opacity-50"
+              >
+                {cloneMutation.isPending ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : t.deckDetails.copyToDecks}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cardToDelete !== null && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label={t.common.cancel}
+            disabled={deleteCardMutation.isPending}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setCardToDelete(null)}
+          />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-card-title"
+            aria-describedby="delete-card-description"
+            className="relative z-10 w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl animate-in zoom-in-95 duration-200"
+          >
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+              <Trash2 className="h-7 w-7" />
+            </div>
+            <h2 id="delete-card-title" className="text-center text-xl font-black text-gray-800">
+              {t.common.delete}
+            </h2>
+            <p id="delete-card-description" className="mt-2 text-center text-sm font-medium text-gray-500">
+              {t.deckDetails.removeCardConfirm}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                disabled={deleteCardMutation.isPending}
+                onClick={() => setCardToDelete(null)}
+                className="flex-1 rounded-xl border-2 border-gray-100 px-4 py-3 font-black text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                {t.common.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={deleteCardMutation.isPending}
+                onClick={confirmDeleteCard}
+                className="flex-1 rounded-xl bg-red-500 px-4 py-3 font-black text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+              >
+                {deleteCardMutation.isPending ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : t.common.delete}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDeleteDeckConfirmOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label={t.common.cancel}
+            disabled={deleteDeckMutation.isPending}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setIsDeleteDeckConfirmOpen(false)}
+          />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-deck-title"
+            aria-describedby="delete-deck-description"
+            className="relative z-10 w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl animate-in zoom-in-95 duration-200"
+          >
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+              <Trash2 className="h-7 w-7" />
+            </div>
+            <h2 id="delete-deck-title" className="text-center text-xl font-black text-gray-800">
+              {t.common.delete}
+            </h2>
+            <p id="delete-deck-description" className="mt-2 text-center text-sm font-medium text-gray-500">
+              {t.deckDetails.deleteConfirm}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                disabled={deleteDeckMutation.isPending}
+                onClick={() => setIsDeleteDeckConfirmOpen(false)}
+                className="flex-1 rounded-xl border-2 border-gray-100 px-4 py-3 font-black text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                {t.common.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={deleteDeckMutation.isPending}
+                onClick={() => deleteDeckMutation.mutate()}
+                className="flex-1 rounded-xl bg-red-500 px-4 py-3 font-black text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+              >
+                {deleteDeckMutation.isPending ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : t.common.delete}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <CardModal
         isOpen={isModalOpen}
