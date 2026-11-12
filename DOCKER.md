@@ -69,6 +69,30 @@ service. The `extra_hosts` mapping makes `host.docker.internal` work on Linux to
 Other values (`ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`, `DEEPSEEK_API_KEY`,
 Google OAuth, Midtrans) are read from the same `.env` file.
 
+## Inspecting the production database with DBeaver
+
+The MySQL container is bound to `127.0.0.1:3307` on the server only, so it is not
+publicly reachable. After deploying the Compose port mapping, connect from your computer
+through SSH:
+
+```bash
+ssh -N -L 3307:127.0.0.1:3307 <ssh-user>@kilas.my.id
+```
+
+Keep that terminal open, then create a MySQL connection in DBeaver with host
+`127.0.0.1`, port `3307`, and the database name, username, and password from the
+server's `.env`. Use the application database user rather than `root`. Never replace
+the loopback-only port binding with a public `3306:3306` mapping.
+
+Apply the port mapping on the server from the repository directory with:
+
+```bash
+docker compose up -d db
+```
+
+This recreates the database container to apply the port mapping but keeps the `db_data`
+volume.
+
 ## Operations
 
 ```bash
