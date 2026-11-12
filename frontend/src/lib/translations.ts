@@ -146,7 +146,7 @@ export const translations = {
       browsing: 'Menjelajahi Pustaka...',
       copies: 'salinan',
       noDescription: 'Tidak ada deskripsi',
-      copyToDecks: 'SALIN KE DECK SAYA',
+      copyToDecks: 'SALIN',
       noLibraryFound: 'Deck publik tidak ditemukan',
       trySearch: 'Coba pencarian lain atau periksa lagi nanti!',
       copyConfirm: 'Salin "{title}" ke deck Anda? Semua kartu akan disertakan.',
