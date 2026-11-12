@@ -14,6 +14,9 @@ services:
       MYSQL_DATABASE: ${DATABASE_NAME:-kilas}
       MYSQL_USER: ${DATABASE_USERNAME:-kilas}
       MYSQL_PASSWORD: ${DATABASE_PASSWORD:-kilas}
+    ports:
+      # Bind only to the server's loopback interface; use SSH tunneling for remote access.
+      - "127.0.0.1:3307:3306"
     volumes:
       # Persist the database across container rebuilds
       - db_data:/var/lib/mysql
