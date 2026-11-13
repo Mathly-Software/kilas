@@ -28,9 +28,20 @@ var w = []float64{
 	0.29, 2.61, // Retrievability
 }
 
+const (
+	AlgorithmFSRS     = "fsrs"
+	AlgorithmSM2      = "sm2"
+	AlgorithmCombined = "combined"
+)
+
 // ApplyFSRS applies the FSRS algorithm to a card.
 // quality: 0=Again, 1=Hard, 2=Good, 3=Easy
 func ApplyFSRS(card *model.Card, quality int) {
+	if quality < 0 || quality > 3 {
+		return
+	}
+
+	now := time.Now()
 	rating := quality + 1 // FSRS ratings: 1, 2, 3, 4
 
 	if card.Stability == 0 {
@@ -39,7 +50,11 @@ func ApplyFSRS(card *model.Card, quality int) {
 		card.Difficulty = w[4] - w[5]*float64(rating-3)
 	} else {
 		// Reviewing existing card
-		elapsedDays := time.Since(card.UpdatedAt).Hours() / 24
+		lastReviewed := card.UpdatedAt
+		if card.LastReviewedAt != nil {
+			lastReviewed = *card.LastReviewedAt
+		}
+		elapsedDays := now.Sub(lastReviewed).Hours() / 24
 		if elapsedDays < 0 {
 			elapsedDays = 0
 		}
@@ -71,10 +86,71 @@ func ApplyFSRS(card *model.Card, quality int) {
 	// User requested "Again" cards not appear again in same session.
 	// Standard FSRS would set a small learning interval, but we'll set it to 1 day.
 	if rating == 1 {
-		card.DueDate = time.Now().Add(24 * time.Hour)
+		card.DueDate = now.Add(24 * time.Hour)
 	} else {
-		card.DueDate = time.Now().Add(time.Duration(card.Interval) * 24 * time.Hour)
+		card.DueDate = now.Add(time.Duration(card.Interval) * 24 * time.Hour)
 	}
+	card.LastReviewedAt = &now
+}
+
+// updateSM2Memory updates SM-2's independent scheduling state without changing
+// the shared interval or due date used by the active scheduler.
+func updateSM2Memory(card *model.Card, quality int) {
+	q := []float64{1, 2, 4, 5}[quality]
+	if card.SM2EaseFactor <= 0 {
+		card.SM2EaseFactor = 2.5
+	}
+
+	if q >= 3 {
+		switch card.SM2Repetitions {
+		case 0:
+			card.SM2Interval = 1
+		case 1:
+			card.SM2Interval = 6
+		default:
+			card.SM2Interval = int(math.Round(float64(card.SM2Interval) * card.SM2EaseFactor))
+		}
+		card.SM2Repetitions++
+		card.SM2EaseFactor += 0.1 - (5-q)*(0.08+(5-q)*0.02)
+		if card.SM2EaseFactor < 1.3 {
+			card.SM2EaseFactor = 1.3
+		}
+	} else {
+		card.SM2Repetitions = 0
+		card.SM2Interval = 1
+	}
+
+	if card.SM2Interval < 1 {
+		card.SM2Interval = 1
+	}
+}
+
+// ApplySM2 applies SM-2 as the active scheduler.
+// quality: 0=Again, 1=Hard, 2=Good, 3=Easy
+func ApplySM2(card *model.Card, quality int) {
+	if quality < 0 || quality > 3 {
+		return
+	}
+
+	updateSM2Memory(card, quality)
+	now := time.Now()
+	card.Repetitions++
+	card.Interval = card.SM2Interval
+	card.EaseFactor = card.SM2EaseFactor
+	card.DueDate = now.Add(time.Duration(card.SM2Interval) * 24 * time.Hour)
+	card.LastReviewedAt = &now
+}
+
+// ApplyFSRSAndSM2 updates both algorithms' memory. FSRS remains authoritative
+// for the due date while SM-2 progress is maintained alongside it.
+func ApplyFSRSAndSM2(card *model.Card, quality int) {
+	if quality < 0 || quality > 3 {
+		return
+	}
+
+	ApplyFSRS(card, quality)
+	updateSM2Memory(card, quality)
+	card.EaseFactor = card.SM2EaseFactor
 }
 
 func (s *StudyService) GetDueCards(deckID, userID uint) ([]model.Card, error) {
@@ -94,9 +170,18 @@ func (s *StudyService) GetDueCards(deckID, userID uint) ([]model.Card, error) {
 }
 
 func (s *StudyService) StartSession(userID, deckID uint) (*model.StudySession, error) {
+	deck, err := s.DeckRepo.FindByID(deckID)
+	if err != nil {
+		return nil, err
+	}
+	if deck.UserID != userID {
+		return nil, errors.New("forbidden")
+	}
+
 	session := &model.StudySession{
 		UserID:    userID,
 		DeckID:    deckID,
+		Algorithm: AlgorithmCombined,
 		StartedAt: time.Now(),
 	}
 	if err := s.StudyRepo.CreateSession(session); err != nil {
@@ -106,10 +191,22 @@ func (s *StudyService) StartSession(userID, deckID uint) (*model.StudySession, e
 }
 
 func (s *StudyService) SubmitReview(sessionID, cardID, userID uint, quality int) (*model.Card, error) {
+	session, err := s.StudyRepo.FindSessionByID(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if session.UserID != userID {
+		return nil, errors.New("forbidden")
+	}
+
 	// Load card
 	card, err := s.CardRepo.FindByID(cardID)
 	if err != nil {
 		return nil, err
+	}
+
+	if card.DeckID != session.DeckID {
+		return nil, errors.New("forbidden")
 	}
 
 	// Verify card's deck belongs to user
@@ -121,8 +218,18 @@ func (s *StudyService) SubmitReview(sessionID, cardID, userID uint, quality int)
 		return nil, errors.New("forbidden")
 	}
 
-	// Apply FSRS
-	ApplyFSRS(card, quality)
+	// Existing sessions keep their recorded scheduler. New sessions run both
+	// algorithms, with FSRS deciding when the card is due.
+	switch session.Algorithm {
+	case "", AlgorithmFSRS:
+		ApplyFSRS(card, quality)
+	case AlgorithmSM2:
+		ApplySM2(card, quality)
+	case AlgorithmCombined:
+		ApplyFSRSAndSM2(card, quality)
+	default:
+		return nil, errors.New("invalid session scheduling algorithm")
+	}
 
 	// Save card
 	if err := s.CardRepo.Update(card); err != nil {
@@ -141,10 +248,6 @@ func (s *StudyService) SubmitReview(sessionID, cardID, userID uint, quality int)
 	}
 
 	// Increment session cards studied
-	session, err := s.StudyRepo.FindSessionByID(sessionID)
-	if err != nil {
-		return nil, err
-	}
 	session.CardsStudied++
 	if err := s.StudyRepo.UpdateSession(session); err != nil {
 		return nil, err

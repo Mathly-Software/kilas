@@ -6,6 +6,7 @@ type StudySession struct {
 	ID           uint         `gorm:"primaryKey" json:"id"`
 	UserID       uint         `gorm:"not null;index" json:"user_id"`
 	DeckID       uint         `gorm:"not null;index" json:"deck_id"`
+	Algorithm    string       `gorm:"type:varchar(16);not null;default:fsrs" json:"algorithm"`
 	CardsStudied int          `gorm:"default:0" json:"cards_studied"`
 	Duration     int          `json:"duration"`
 	StartedAt    time.Time    `json:"started_at"`
