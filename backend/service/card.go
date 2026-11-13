@@ -43,6 +43,7 @@ func (s *CardService) Create(deckID, userID uint, req dto.CardRequest) (*model.C
 		Interval:      0,
 		Repetitions:   0,
 		EaseFactor:    2.5,
+		SM2EaseFactor: 2.5,
 		DueDate:       time.Now(),
 	}
 

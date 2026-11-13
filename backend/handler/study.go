@@ -54,6 +54,10 @@ func (h *StudyHandler) StartSession(c *gin.Context) {
 
 	session, err := h.StudyService.StartSession(userID, req.DeckID)
 	if err != nil {
+		if err.Error() == "forbidden" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

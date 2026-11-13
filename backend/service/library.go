@@ -136,11 +136,11 @@ func (s *LibraryService) Clone(sourceDeckID, userID uint) (*model.Deck, error) {
 
 	// Create new deck
 	newDeck := &model.Deck{
-		UserID:      userID,
-		Title:       fmt.Sprintf("Copy of %s", source.Title),
-		Description: source.Description,
-		IsPublic:    false,
-		Tags:        source.Tags,
+		UserID:        userID,
+		Title:         fmt.Sprintf("Copy of %s", source.Title),
+		Description:   source.Description,
+		IsPublic:      false,
+		Tags:          source.Tags,
 		IsAIGenerated: source.IsAIGenerated,
 	}
 	if err := s.DeckRepo.Create(newDeck); err != nil {
@@ -158,6 +158,7 @@ func (s *LibraryService) Clone(sourceDeckID, userID uint) (*model.Deck, error) {
 			Interval:      0,
 			Repetitions:   0,
 			EaseFactor:    2.5,
+			SM2EaseFactor: 2.5,
 			DueDate:       time.Now(),
 			IsAICreated:   card.IsAICreated,
 		}

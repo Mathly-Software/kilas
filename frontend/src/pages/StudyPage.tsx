@@ -34,6 +34,7 @@ export default function StudyPage() {
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [startTime] = useState(Date.now());
   const [studiedCount, setStudiedCount] = useState(0);
+  const [extraReviewCards, setExtraReviewCards] = useState<Card[]>([]);
   const [isFinished, setIsFinished] = useState(false);
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
   // Fetch due cards (online only)
@@ -86,6 +87,7 @@ export default function StudyPage() {
     onSuccess: (data) => {
       setSessionId(data.session_id);
     },
+    onError: () => toast.error(t.study.startSessionError),
   });
 
   // Review mutation
@@ -104,8 +106,9 @@ export default function StudyPage() {
     },
   });
 
+
   useEffect(() => {
-    if (effectiveData && effectiveData.data.length > 0 && !sessionId && !startSessionMutation.isPending && !isSandbox) {
+    if (effectiveData?.data.length && !sessionId && !startSessionMutation.isPending && !isSandbox) {
       startSessionMutation.mutate();
     }
   }, [effectiveData, sessionId, isSandbox]);
@@ -140,7 +143,9 @@ export default function StudyPage() {
     setIsFinished(false);
     setCurrentIndex(0);
     setStudiedCount(0);
+    setExtraReviewCards([]);
     setIsFlipped(false);
+    setSessionId(null);
   }, [deckId, isSandbox]);
 
   useEffect(() => {
@@ -156,7 +161,7 @@ export default function StudyPage() {
     }
   }, [isSandbox, effectiveData]);
 
-  const cards = effectiveData?.data || [];
+  const cards = [...(effectiveData?.data || []), ...extraReviewCards];
   const currentCard = cards[currentIndex];
 
   const handleRate = useCallback(async (quality: number) => {
@@ -170,7 +175,11 @@ export default function StudyPage() {
       reviewMutation.mutate({ cardId: currentCard.id, quality });
     }
 
-    if (currentIndex < cards.length - 1) {
+    if (quality === 0) {
+      setExtraReviewCards(prev => [...prev, currentCard]);
+    }
+
+    if (currentIndex < cards.length - 1 || quality === 0) {
       setIsFlipped(false);
       // Small delay for flip animation
       setTimeout(() => {
@@ -264,6 +273,7 @@ export default function StudyPage() {
       </div>
     );
   }
+
 
   if (isFinished) {
     return (

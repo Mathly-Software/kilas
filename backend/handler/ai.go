@@ -172,14 +172,15 @@ func (h *AIHandler) GenerateCards(c *gin.Context) {
 	var savedCards []model.Card
 	for _, gc := range generatedData.Cards {
 		card := &model.Card{
-			DeckID:      deckID,
-			Front:       gc.Front,
-			Back:        gc.Back,
-			IsAICreated: true,
-			Interval:    0,
-			Repetitions: 0,
-			EaseFactor:  2.5,
-			DueDate:     time.Now(),
+			DeckID:        deckID,
+			Front:         gc.Front,
+			Back:          gc.Back,
+			IsAICreated:   true,
+			Interval:      0,
+			Repetitions:   0,
+			EaseFactor:    2.5,
+			SM2EaseFactor: 2.5,
+			DueDate:       time.Now(),
 		}
 		if err := h.CardService.CardRepo.Create(card); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save cards"})
